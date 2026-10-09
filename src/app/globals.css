@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f7f4;
+  --surface: #ffffff;
+  --surface-2: #eef0ea;
+  --foreground: #14170f;
+  --muted: #646a5c;
+  --border: #e1e4da;
+  --accent: #3f7d20;
+  --accent-soft: #e3f0d6;
+  --accent-contrast: #ffffff;
+  --protein: #c2410c;
+  --carbs: #b7791f;
+  --fat: #2563a8;
+  --danger: #b42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0d0f0b;
+    --surface: #171a14;
+    --surface-2: #20241b;
+    --foreground: #eef1e8;
+    --muted: #9aa190;
+    --border: #2a2f23;
+    --accent: #9be15d;
+    --accent-soft: #24331a;
+    --accent-contrast: #0d0f0b;
+    --protein: #fb923c;
+    --carbs: #facc15;
+    --fat: #60a5fa;
+    --danger: #f97066;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-protein: var(--protein);
+  --color-carbs: var(--carbs);
+  --color-fat: var(--fat);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* iOS zooms into inputs with font-size < 16px; keep form controls at 16px. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@utility card {
+  @apply rounded-2xl border border-border bg-surface p-4;
+}
+@utility input {
+  @apply w-full rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-foreground outline-none placeholder:text-muted focus:border-accent;
+}
+@utility label {
+  @apply mb-1 block text-sm font-medium text-muted;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold transition active:scale-[0.98] disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-accent text-accent-contrast;
+}
+@utility btn-secondary {
+  @apply btn border border-border bg-surface text-foreground;
+}

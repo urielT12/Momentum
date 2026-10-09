@@ -1,0 +1,57 @@
+# Momentum
+
+A mobile-first fitness tracker (installable web app / PWA):
+
+- **Today**: calories eaten vs. goal, protein / carbs / fat, steps and active calories, the day's meals and workouts. Swipe back through previous days with the arrows.
+- **Meal scanning**: take a photo → Claude estimates each food's portion, calories and macros → review/edit → save.
+- **Workouts**: import Garmin `.FIT` / `.GPX` files, or add workouts manually.
+- **Multi-user**: email/password accounts, every row protected by Postgres row-level security.
+
+Stack: Next.js 16 (App Router) · Supabase (Auth, Postgres, Storage) · Claude API (vision) · Tailwind CSS 4. Deploys to Vercel.
+
+## Setup
+
+1. **Supabase** – create a project at [supabase.com](https://supabase.com), open **SQL Editor**, paste and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
+   - For quick testing you can turn off **Authentication → Sign In / Providers → Email → Confirm email**. If you keep it on, set **Authentication → URL Configuration → Site URL** to your app URL.
+2. **Anthropic** – create an API key at [console.anthropic.com](https://console.anthropic.com) (meal scans cost a few cents each).
+3. **Env** – `cp .env.example .env.local` and fill in the three values.
+4. `npm install && npm run dev` → http://localhost:3000
+
+### Try it on your iPhone during development
+
+Your phone and PC must be on the same Wi-Fi. Find your PC's IP with `ipconfig` (e.g. `192.168.1.20`), run `npm run dev -- -H 192.168.1.20`, and open `http://192.168.1.20:3000` in Safari. Photo upload works over plain HTTP on the local network.
+
+## Deploy (so it works anywhere from your phone)
+
+1. Push this repo to GitHub.
+2. Import it on [vercel.com](https://vercel.com) → add the same env vars → Deploy.
+3. In Supabase, set **Site URL** to the Vercel URL.
+4. On the iPhone: open the URL in Safari → Share → **Add to Home Screen**. It launches full screen like a native app.
+
+## Getting Garmin data in
+
+| What | How (MVP) |
+|---|---|
+| Workouts | Garmin Connect → activity → ⚙ → **Export Original** (unzip → `.fit`) or **Export to GPX** → upload on the Workouts tab. Duplicates are skipped. |
+| Steps / active calories | Enter from the Garmin app on the Today screen. |
+
+Automatic sync options for later: apply to the [Garmin Connect Developer Program](https://developer.garmin.com/gc-developer-program/) (Health API push), use an aggregator such as Terra, or wrap the app in a native shell (Expo/Capacitor) to read Apple Health, which Garmin Connect already syncs into.
+
+## Project layout
+
+```
+src/
+  proxy.ts                     session refresh + redirect to /login
+  app/(app)/                   signed-in screens (Today, Log meal, Workouts, Settings) + server actions
+  app/api/meals/analyze        uploads photo to Storage, calls Claude, returns estimate
+  app/api/workouts/import      parses .fit/.gpx and inserts workouts
+  lib/nutrition.ts             Claude vision prompt + structured output schema
+  lib/workout-import.ts        FIT/GPX parsing
+supabase/migrations/           database schema, RLS policies, storage bucket
+```
+
+## Roadmap
+
+- Social feed: friends/follow table, a `visibility` column on meals/workouts, RLS policies that allow followers to read shared posts, likes/comments.
+- Automatic Garmin / Apple Health sync.
+- Weekly trends and charts, saved/favourite meals, barcode scanning.
