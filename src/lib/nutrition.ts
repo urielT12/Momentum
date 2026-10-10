@@ -1,6 +1,5 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { ApiError, GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { MEAL_TYPES } from "@/lib/types";
 
@@ -32,8 +31,15 @@ const SYSTEM_PROMPT = `You are a nutrition analyst inside a fitness tracking app
 For each distinct food or drink you can see, estimate the portion from visual cues (plate size, utensils, hands, packaging) and give calories and macronutrients for that portion, using standard nutrition databases (USDA-style values) as your reference. Account for likely cooking oil, butter, dressings and sauces, since these are the most common source of underestimation, and mention such assumptions in notes.
 
 If the user adds a note (e.g. "2 eggs, cooked in olive oil"), treat it as more reliable than the photo. If the photo is not food, set is_food to false and return an empty items list. Choose meal_type from the local time of day given, unless the food clearly suggests otherwise.`;
+// Gemini takes a plain JSON Schema; drop the "$schema" meta key zod adds.
+const RESPONSE_SCHEMA: Record<string, unknown> = { ...z.toJSONSchema(MealAnalysisSchema) };
+delete RESPONSE_SCHEMA.$schema;
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
+
+export function isMealScanConfigured() {
+  return Boolean(process.env.GEMINI_API_KEY);
+}
 
 export async function analyzeMealPhoto(input: {
   imageBase64: string;
@@ -41,6 +47,8 @@ export async function analyzeMealPhoto(input: {
   localTime: string;
   note?: string;
 }): Promise<MealAnalysis> {
+  if (!isMealScanConfigured()) throw new Error("Photo scanning is not set up yet.");
+
   const userText = [
     `Local time: ${input.localTime}.`,
     input.note ? `User note: ${input.note}` : null,
@@ -49,34 +57,33 @@ export async function analyzeMealPhoto(input: {
     .filter(Boolean)
     .join("\n");
 
-  client ??= new Anthropic();
-  const response = await client.beta.messages.parse({
-    model: process.env.ANTHROPIC_MODEL || "claude-opus-5",
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: input.mediaType, data: input.imageBase64 },
-          },
-          { type: "text", text: userText },
-        ],
-      },
-    ],
-    output_config: { format: betaZodOutputFormat(MealAnalysisSchema) },
-  });
+  client ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error("The photo could not be analyzed. Try another photo.");
+  let text: string | undefined;
+  try {
+    const response = await client.models.generateContent({
+      model: process.env.GEMINI_MODEL || "gemini-flash-latest",
+      contents: [
+        {
+          role: "user",
+          parts: [{ inlineData: { mimeType: input.mediaType, data: input.imageBase64 } }, { text: userText }],
+        },
+      ],
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        responseJsonSchema: RESPONSE_SCHEMA,
+      },
+    });
+    text = response.text;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) {
+      throw new Error("Free scan limit reached for now. Try again in a minute, or enter the meal manually.");
+    }
+    throw err;
   }
-  if (!response.parsed_output) {
-    throw new Error("Could not read the analysis result. Please try again.");
-  }
-  return response.parsed_output;
+
+  const parsed = MealAnalysisSchema.safeParse(text ? JSON.parse(text) : null);
+  if (!parsed.success) throw new Error("Could not read the analysis result. Please try again.");
+  return parsed.data;
 }

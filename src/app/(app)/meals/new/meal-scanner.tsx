@@ -37,7 +37,7 @@ const MACROS = [
 
 const emptyItem = (): EditableItem => ({ name: "", portion: "", calories: "", protein_g: "", carbs_g: "", fat_g: "" });
 
-export function MealScanner() {
+export function MealScanner({ scanEnabled }: { scanEnabled: boolean }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -166,7 +166,13 @@ export function MealScanner() {
         }}
       />
 
-      {!draft && (
+      {!draft && !scanEnabled && (
+        <button type="button" className="btn-primary w-full" onClick={startManual}>
+          <PlusIcon width={20} height={20} /> Add meal
+        </button>
+      )}
+
+      {!draft && scanEnabled && (
         <div className="card space-y-3">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element -- local object URL
@@ -375,7 +381,7 @@ function guessMealType(): MealType {
   return "snack";
 }
 
-// Phone photos are large; downscale to the size Claude's vision works with
+// Phone photos are large; downscale to a size that's plenty for vision models
 // and re-encode as JPEG (this also converts HEIC from iPhones).
 async function resizeImage(file: File, maxSide: number): Promise<Blob> {
   const url = URL.createObjectURL(file);

@@ -3,18 +3,18 @@
 A mobile-first fitness tracker (installable web app / PWA):
 
 - **Today**: calories eaten vs. goal, protein / carbs / fat, steps and active calories, the day's meals and workouts. Swipe back through previous days with the arrows.
-- **Meal scanning**: take a photo → Claude estimates each food's portion, calories and macros → review/edit → save.
+- **Meal scanning**: take a photo → Gemini estimates each food's portion, calories and macros → review/edit → save.
 - **Workouts**: import Garmin `.FIT` / `.GPX` files, or add workouts manually.
 - **Multi-user**: email/password accounts, every row protected by Postgres row-level security.
 
-Stack: Next.js 16 (App Router) · Supabase (Auth, Postgres, Storage) · Claude API (vision) · Tailwind CSS 4. Deploys to Vercel.
+Stack: Next.js 16 (App Router) · Supabase (Auth, Postgres, Storage) · Gemini API (vision, free tier) · Tailwind CSS 4. Deploys to Vercel.
 
 ## Setup
 
 1. **Supabase** – create a project at [supabase.com](https://supabase.com), open **SQL Editor**, paste and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
    - For quick testing you can turn off **Authentication → Sign In / Providers → Email → Confirm email**. If you keep it on, set **Authentication → URL Configuration → Site URL** to your app URL.
-2. **Anthropic** – create an API key at [console.anthropic.com](https://console.anthropic.com) (meal scans cost a few cents each).
-3. **Env** – `cp .env.example .env.local` and fill in the three values.
+2. **Gemini (optional, free)** – create an API key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). No credit card needed. Free-tier requests may be used by Google to improve its products, and have per-minute/per-day limits. Without a key, photo scanning is hidden and meals are entered manually.
+3. **Env** – `cp .env.example .env.local` and fill in the values.
 4. `npm install && npm run dev` → http://localhost:3000
 
 ### Try it on your iPhone during development
@@ -43,9 +43,9 @@ Automatic sync options for later: apply to the [Garmin Connect Developer Program
 src/
   proxy.ts                     session refresh + redirect to /login
   app/(app)/                   signed-in screens (Today, Log meal, Workouts, Settings) + server actions
-  app/api/meals/analyze        uploads photo to Storage, calls Claude, returns estimate
+  app/api/meals/analyze        uploads photo to Storage, calls Gemini, returns estimate
   app/api/workouts/import      parses .fit/.gpx and inserts workouts
-  lib/nutrition.ts             Claude vision prompt + structured output schema
+  lib/nutrition.ts             Gemini vision prompt + structured output schema
   lib/workout-import.ts        FIT/GPX parsing
 supabase/migrations/           database schema, RLS policies, storage bucket
 ```

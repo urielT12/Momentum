@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { getUserForApi } from "@/lib/auth";
-import { analyzeMealPhoto } from "@/lib/nutrition";
+import { analyzeMealPhoto, isMealScanConfigured } from "@/lib/nutrition";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"] as const;
 type Allowed = (typeof ALLOWED)[number];
 
-// Uploads the meal photo to private storage and returns Claude's nutrition estimate.
+// Uploads the meal photo to private storage and returns Gemini's nutrition estimate.
 // Nothing is written to the meals table here; the user reviews and saves on the client.
 export async function POST(request: Request) {
   const auth = await getUserForApi();
   if (!auth) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const { supabase, userId, profile } = auth;
+  if (!isMealScanConfigured()) {
+    return NextResponse.json({ error: "Photo scanning is not set up yet." }, { status: 503 });
+  }
 
   const form = await request.formData();
   const photo = form.get("photo");
