@@ -1,0 +1,64 @@
+# Deploys to Vercel on every push to main.
+# All keys come from GitHub → Settings → Secrets and variables → Actions;
+# they are passed to Vercel per deployment and never stored in the repo.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx next typegen && npx tsc --noEmit
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check required secrets
+        run: |
+          missing=0
+          for name in VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::Missing secret $name"; missing=1; fi
+          done
+          if [ -z "$GEMINI_API_KEY" ]; then echo "::warning::GEMINI_API_KEY not set; photo scanning will be disabled"; fi
+          exit $missing
+
+      # NEXT_PUBLIC_* values are inlined at build time (--build-env);
+      # everything is also provided to the running app (--env).
+      - name: Deploy to Vercel
+        run: |
+          url=$(npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN" \
+            --build-env NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            --build-env NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            --env NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            --env GEMINI_API_KEY="$GEMINI_API_KEY")
+          echo "Deployed: $url" >> "$GITHUB_STEP_SUMMARY"
